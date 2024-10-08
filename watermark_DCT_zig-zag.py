@@ -17,28 +17,28 @@ def zigzag_indices(n):
     return idx_list
 
 # ฟังก์ชันฝังลายน้ำลงใน DCT ของภาพแต่ละช่องสี (ขนาด 8x8)
-def embed_watermark(image_channel, watermark_channel, alpha=0.01):  # ลดค่า alpha เพื่อเพิ่มความเนียน
+def embed_watermark(image_channel, watermark_channel,size, alpha=100):  # ลดค่า alpha เพื่อเพิ่มความเนียน
     h, w = image_channel.shape
     watermarked_channel = np.zeros_like(image_channel)
     
     # แปลงภาพเป็นบล็อก 8x8 และทำ DCT
-    for i in range(0, h, 8):
-        for j in range(0, w, 8):
-            block = image_channel[i:i+8, j:j+8]
+    for i in range(0, h, size):
+        for j in range(0, w, size):
+            block = image_channel[i:i+size, j:j+size]
             
             # ตรวจสอบว่าขนาดบล็อกเป็น 8x8 หรือไม่
-            if block.shape[0] != 8 or block.shape[1] != 8:
+            if block.shape[0] != size or block.shape[1] != size:
                 continue  # ข้ามบล็อกที่ไม่ใช่ขนาด 8x8
             
             dct_block = scipy.fftpack.dct(scipy.fftpack.dct(block.T, norm='ortho').T, norm='ortho')
             
             # Zig-zag scan
-            zigzag = zigzag_indices(8)
+            zigzag = zigzag_indices(size)
             
             # ฝังลายน้ำลงในค่าสัมประสิทธิ์ DCT
             for k in range(min(len(zigzag), len(watermark_channel))):
                 idx = zigzag[k]
-                x, y = idx // 8, idx % 8  # ปรับให้เข้ากับบล็อกขนาด 8x8
+                x, y = idx // size, idx % size  # ปรับให้เข้ากับบล็อกขนาด 8x8
                 dct_block[x, y] += alpha * watermark_channel[k]
             
             # inverse DCT
@@ -47,7 +47,7 @@ def embed_watermark(image_channel, watermark_channel, alpha=0.01):  # ลดค�
             # กรองภาพหลังจาก IDCT
             idct_block = np.clip(idct_block, 0, 255)  # จำกัดค่าให้ภายในช่วง [0, 255]
             
-            watermarked_channel[i:i+8, j:j+8] = idct_block
+            watermarked_channel[i:i+size, j:j+size] = idct_block
     
     return watermarked_channel
 
@@ -63,7 +63,9 @@ def load_image(filename, color_mode=cv2.IMREAD_COLOR):
 # โหลดภาพต้นฉบับเป็นภาพสี
 image = load_image('image.png')  # เปลี่ยนเป็น .jpg หรือ .png ตามต้องการ
 # โหลดลายน้ำ
-watermark = load_image('watermark.png', cv2.IMREAD_GRAYSCALE)  # เปลี่ยนเป็น .jpg หรือ .png ตามต้องการ
+watermark = load_image('watermark2.png', cv2.IMREAD_GRAYSCALE)  # เปลี่ยนเป็น .jpg หรือ .png ตามต้องการ
+
+s = 128
 
 # แยกภาพออกเป็นช่องสี (BGR)
 b_channel, g_channel, r_channel = cv2.split(image)
@@ -72,12 +74,18 @@ b_channel, g_channel, r_channel = cv2.split(image)
 watermark_resized = cv2.resize(watermark, (image.shape[1], image.shape[0]))
 
 # ฝังลายน้ำในแต่ละช่องสี
-watermarked_b = embed_watermark(b_channel, watermark_resized.flatten())
-watermarked_g = embed_watermark(g_channel, watermark_resized.flatten())
-watermarked_r = embed_watermark(r_channel, watermark_resized.flatten())
+# watermarked_b = b_channel
+# watermarked_g = g_channel
+# watermarked_r = r_channel
+watermarked_b = embed_watermark(b_channel, watermark_resized.flatten(),s)
+watermarked_g = embed_watermark(g_channel, watermark_resized.flatten(),s)
+watermarked_r = embed_watermark(r_channel, watermark_resized.flatten(),s)
 
 # รวมภาพช่องสีที่ฝังลายน้ำแล้วกลับมาเป็นภาพสี
 watermarked_image = cv2.merge((watermarked_b, watermarked_g, watermarked_r))
 
 # บันทึกผลลัพธ์
 cv2.imwrite('watermarked_image_color.png', watermarked_image)  # เปลี่ยนเป็น .jpg หรือ .png ตามต้องการ
+cv2.imwrite('watermarked_b.png', watermarked_b)
+cv2.imwrite('watermarked_g.png', watermarked_g)
+cv2.imwrite('watermarked_r.png', watermarked_r)
